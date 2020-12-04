@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>jQuery UI Autocomplete - Categories</title>
+  <link rel="stylesheet" href="jquery-ui.css">
+  <script src="jquery-1.11.3.js"></script>
+  <script src="jquery-ui.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /*
+    Use for changing font of matching substring or characters
+    */
+    .ui-autocomplete .match{
+      color: blue;
+      font-weight:normal;
+    }
+
+    /*
+    Use for changing font of unmatching string or characters
+    */
+    .ui-autocomplete .unmatch{
+      color: black;
+      font-weight: bold;
+    }
+
+    /*
+	  Use for Scrollable Task
+    */
+    .ui-autocomplete{
+      max-height: 100px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    *html .ui-autocomplete{
+      height:100px;
+    }
+
+    /*
+	  Use for Categorize Task
+    */
+    .ui-autocomplete-category{
+      font-weight:bold;
+      padding: .2em .4em;
+      margin: .8em 0 .2em;
+      line-height: 1.5;
+      color:red;
+    }
+  </style>
+
+  <script>
+    $(function(){
+      var uncategorized_data = ["Afghanistan",
+                                "Albania",
+                                "Algeria",
+                                "American Samoa",
+                                "Andorra",
+                                "Angola",
+                                "Anguilla",
+                                "Antarctica",
+                                "Aruba",
+                                "Armenia",
+                                "Australia",
+                                "Austria",
+                                "Azerbaijan",
+                                "Bahamas",
+                                "Bahrain",
+                                "Bangladesh",
+                                "Barbados",
+                                "Belarus",
+                                "Belgium",
+                                "Belize",
+                                "Benin",
+                                "Bermuda",
+                                "Bhutan",
+                                "Bolivia",
+                                "Bosnia and Herzegovina",
+                                "Bouvet Island",
+                                "Brazil",
+                                "British Antarctic Territory",
+                                "British Indian Ocean Territory",
+                                "British Virgin Islands"];
+      /*
+      Helper functions for multiple values searching
+      */
+      function split(val){
+          return val.split(/,\s*/);
+      }
+      function extractLast(term){
+          return split(term).pop();
+      }
+
+
+      $.widget("custom.catcomplete",$.ui.autocomplete,{
+        _create: function(){
+          this._super();
+          this.widget().menu("option","items","> :not(.ui-autocomplete-category)");
+        },
+        _renderMenu: function(ul,items){
+          var that=this;
+          $.each(items,function(index,item){
+            // Do not consider Categorize task in this case
+            // var li;
+            // if(item.category!=currentCategory){
+            //   if(item.category=="") {
+            //     ul.append("<li class='ui-autocomplete-category'>Others</li>")
+            //     currentCategory=item.category;
+            //   }
+            //   else{
+            //     ul.append("<li class='ui-autocomplete-category'>"+item.category+"</li>")
+            //     currentCategory=item.category;
+            //   }
+            // }
+            that._renderItemData(ul,item);
+          });
+        },
+        _renderItem: function(ul, item) {
+          terms = this.term.split(',');
+          term = terms[terms.length - 1].trim();
+          this.term=extractLast(this.term); // consider the last term
+          var $div = $("<div></div>").text(item.label); // create new node 
+          highlightText(this.term, $div); // changing font appropriately
+          return $("<li></li>").append($div).appendTo(ul);
+        }   
+      });
+      /*
+      Perform font changing task, blue color font for matching substring or characters, and bold for the rest
+      This is based on the Example code 1 given in the 5th week
+      */
+      function highlightText(text, $node) {
+        var searchText = $.trim(text).toLowerCase(), currentNode = $node.get(0).firstChild, matchIndex, newTextNode, newSpanNode, track = 0;
+        while ((matchIndex = currentNode.data.toLowerCase().indexOf(searchText)) >= 0) {
+          newTextNode = currentNode.splitText(matchIndex);
+          if(track==0) {
+            restSpanNode = document.createElement("span");
+            restSpanNode.className = "unmatch";
+            newTextNode.parentNode.insertBefore(restSpanNode, newTextNode);
+            restSpanNode.appendChild(currentNode);
+          }
+          currentNode = newTextNode.splitText(searchText.length);          
+          newSpanNode = document.createElement("span");
+          newSpanNode.className = "match";
+          restSpanNode = document.createElement("span");
+          restSpanNode.className = "unmatch";                 
+          currentNode.parentNode.insertBefore(newSpanNode, currentNode);
+          newSpanNode.appendChild(newTextNode);   
+          newTextNode.parentNode.insertBefore(restSpanNode, newTextNode.nextSibling);
+          restSpanNode.appendChild(currentNode);
+          track++;
+        }
+      }
+      var isSearching = true, track = 0, current = 0; 
+      $("#search01")
+      .on("keydown",function(event){
+        current += 1;
+        if(event.keyCode===$.ui.keyCode.TAB &&
+          $(this).catcomplete("instance").menu.active){
+          event.preventDefault(); // prevent default suggestion menu
+        }
+      })
+      .catcomplete({
+        minLength:1,
+        source: function(request,response){
+          //delegate back to autocomplete, but extract the last term
+          if(isSearching){
+            response($.ui.autocomplete.filter(
+              uncategorized_data, extractLast(request.term)));
+          }
+        },
+        focus: function(){
+          //prevent value inserted on focus
+          return false;
+        },
+        select: function(event,ui){
+          var terms = split(this.value);
+          //remove the current input 
+          terms.pop();
+          //add the selected item
+          terms.push(ui.item.value);
+          // add placeholder to get the comma-and-space at the end
+          terms.push("");
+          this.value = terms.join(", ");
+          current = 0; // refresh current and track for
+          track = 0;   // considering the next type-in text
+          return false;
+        }
+      }).keydown(function(event, ui){
+        if(event.keyCode==8){
+          track += 1; // increment track if we press "backspace"  
+        }
+        if(2*track == current){ // if number of times we press "backspace" 
+          track = 0;            // = number of characters we typed in 
+          current = 0;          // then we do not need to perform anything
+          isSearching = false;  // , just reset track and current 
+        }
+        else{
+          isSearching = true; // in case there is still at least one character, continue searching
+        }
+      });
+    });
+  </script>
+  </script>
+
+  <script>
+    // except for categorizing the suggestions, the other parts stay the same as above
+  	$(function(){
+      var categorized_data = [
+        {label:"Algeria",category:"Africa"},
+        {label:"Angola",category:"Africa"},
+        {label:"Benin",category:"Africa"},
+        {label:"American Samoa",category:"America"},
+        {label:"Aruba",category:"America"},
+        {label:"Belize",category:"America"},
+        {label:"Bolivia",category:"America"},
+        {label:"Brazil",category:"America"},
+        {label:"Afghanistan",category:"Asia"},
+        {label:"Armenia",category:"Asia"},
+        {label:"Azerbaijan",category:"Asia"},
+        {label:"Bahrain",category:"Asia"},
+        {label:"Bangladesh",category:"Asia"},
+        {label:"Bhutan",category:"Asia"},
+        {label:"Albania",category:"Europe"},
+        {label:"Andorra",category:"Europe"},
+        {label:"Anguilla",category:"Europe"},
+        {label:"Austria",category:"Europe"},
+        {label:"Bahamas",category:"Europe"},
+        {label:"Barbados",category:"Europe"},
+        {label:"Belarus",category:"Europe"},
+        {label:"Belgium",category:"Europe"},
+        {label:"Bermuda",category:"Europe"},
+        {label:"Bosnia and Herzegovina",category:"Europe"},
+        {label:"Australia",category:"Oceania"},
+        {label:"Bouvet Island",category:"Oceania"},
+        {label:"Antarctica",category:"South Pole"},
+        {label:"British Antarctic Territory",category:""},
+        {label:"British Indian Ocean Territory",category:""},
+        {label:"British Virgin Islands",category:""}
+      ]
+      function split(val){
+          return val.split(/,\s*/);
+      }
+      function extractLast(term){
+          return split(term).pop();
+      }
+      $.widget("custom.catcomplete",$.ui.autocomplete,{
+        _create: function(){
+          this._super();
+          this.widget().menu("option","items","> :not(.ui-autocomplete-category)");
+        },
+        _renderMenu: function(ul,items){
+          var that=this, currentCategory="";
+          $.each(items,function(index,item){
+            var li;
+            if(item.category!=currentCategory){
+              if(item.category=="") {
+                // if do not belong to any category, put into Others 
+                ul.append("<li class='ui-autocomplete-category'>Others</li>")
+                currentCategory=item.category;
+              }
+              else{
+                // append to ul based on corresponding category
+                ul.append("<li class='ui-autocomplete-category'>"+item.category+"</li>")
+                currentCategory=item.category;
+              }
+            }
+            li= that._renderItemData(ul,item);
+          });
+        },
+        _renderItem: function(ul, item) {
+          terms = this.term.split(',');
+          term = terms[terms.length - 1].trim();
+          this.term=extractLast(this.term);
+          var $div = $("<div></div>").text(item.label);
+          highlightText(this.term, $div);
+          return $("<li></li>").append($div).appendTo(ul);
+        }   
+      });
+      function highlightText(text, $node) {
+        var searchText = $.trim(text).toLowerCase(), currentNode = $node.get(0).firstChild, matchIndex, newTextNode, newSpanNode, track = 0;
+        while ((matchIndex = currentNode.data.toLowerCase().indexOf(searchText)) >= 0) {
+          newTextNode = currentNode.splitText(matchIndex);
+          if(track==0) {
+            restSpanNode = document.createElement("span");
+            restSpanNode.className = "unmatch";
+            newTextNode.parentNode.insertBefore(restSpanNode, newTextNode);
+            restSpanNode.appendChild(currentNode);
+          }
+          currentNode = newTextNode.splitText(searchText.length);          
+          newSpanNode = document.createElement("span");
+          newSpanNode.className = "match";
+          restSpanNode = document.createElement("span");
+          restSpanNode.className = "unmatch";                 
+          currentNode.parentNode.insertBefore(newSpanNode, currentNode);
+          newSpanNode.appendChild(newTextNode);   
+          newTextNode.parentNode.insertBefore(restSpanNode, newTextNode.nextSibling);
+          restSpanNode.appendChild(currentNode);
+          track++;
+        }
+      }
+      var isSearching = true, track = 0, current = 0; 
+      $("#search02")
+      .on("keydown",function(event){
+        current += 1;
+        if(event.keyCode===$.ui.keyCode.TAB &&
+          $(this).catcomplete("instance").menu.active){
+          event.preventDefault();
+        }
+      })
+      .catcomplete({
+        minLength:1,
+        source: function(request,response){
+          if(isSearching){
+            response($.ui.autocomplete.filter(
+              categorized_data, extractLast(request.term)));
+          }
+        },
+        focus: function(){
+          return false;
+        },
+        select: function(event,ui){
+          var terms = split(this.value);
+          terms.pop();
+          terms.push(ui.item.value);
+          terms.push("");
+          this.value = terms.join(", ");
+          current = 0;
+          track = 0;
+          return false;
+        }
+      }).keydown(function(event, ui){
+        if(event.keyCode==8){
+          track += 1;
+        }
+        if(2*track == current){
+          track = 0;
+          current = 0;
+          isSearching = false;
+        }
+        else{
+          isSearching = true;
+        }
+      });
+    });
+  </script>
+
+</head>
+<body>
+
+<div class="ui-widget">
+<p><b>1. Basics Functionalities + Scrollable + Multiple values with Uncategorized Data</b></p>
+<label for="search01">Search: </label>
+<input id="search01"type="text" placeholder="Search">
+</div>
+
+<div class="ui-widget">
+  <p><b>2. Basics Functionalities + Scrollable + Multiple values + Categorize display with Categorized Data</b></p>
+  <label for="search02">Search: </label>
+  <input id="search02"type="text" placeholder="Search">
+</div>
+
+</body>
+</html>
